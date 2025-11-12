@@ -16,6 +16,19 @@ def _create_driver():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
     
+    # Allow camera and geolocation permissions automatically
+    chrome_options.add_argument("--use-fake-ui-for-media-stream")  # Auto-allow camera/mic
+    chrome_options.add_argument("--use-fake-device-for-media-stream")  # Use fake camera device
+    
+    # Set preferences for automatic permissions
+    prefs = {
+        "profile.default_content_setting_values.media_stream_camera": 1,  # Allow camera
+        "profile.default_content_setting_values.media_stream_mic": 1,     # Allow microphone
+        "profile.default_content_setting_values.geolocation": 1,          # Allow geolocation
+        "profile.default_content_setting_values.notifications": 1         # Allow notifications
+    }
+    chrome_options.add_experimental_option("prefs", prefs)
+    
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.implicitly_wait(Config.IMPLICIT_WAIT)

@@ -5,6 +5,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 from pages.base_page import BasePage
 from config.config import Config
+import time
 
 
 class CreateRfiPage(BasePage):
@@ -36,7 +37,7 @@ class CreateRfiPage(BasePage):
 
     def __init__(self, driver):
         super().__init__(driver)
-        self.wait = WebDriverWait(driver, 5)
+        self.wait = WebDriverWait(driver, 10)  # Increased to 10 seconds
 
     # ---------- helpers ----------
 
@@ -80,18 +81,59 @@ class CreateRfiPage(BasePage):
         options = option_text if isinstance(option_text, list) else [option_text]
         print(f"[SELECT] {options}")
 
-        # Open dropdown
-        trigger = self.safe_click(trigger_locator)
-        dropdown_open = (By.XPATH, "//div[@data-part='content' and @data-state='open']")
-        self.wait.until(EC.presence_of_element_located(dropdown_open))
+        try:
+            # Open dropdown
+            print(f"[DEBUG] Clicking dropdown trigger: {trigger_locator}")
+            trigger = self.safe_click(trigger_locator)
+            dropdown_open = (By.XPATH, "//div[@data-part='content' and @data-state='open']")
+            self.wait.until(EC.presence_of_element_located(dropdown_open))
+            print("[DEBUG] Dropdown opened successfully")
+            
+            # Wait for options to load (important for API-driven dropdowns)
+            time.sleep(1.0)  # Give time for options to load from API
+            
+            # Debug: Show available options
+            try:
+                all_options = self.driver.find_elements(By.XPATH, "//div[@data-part='content']//span")
+                available_options = [opt.text for opt in all_options if opt.text.strip()]
+                print(f"[DEBUG] Available options ({len(available_options)}): {available_options[:5]}...")  # Show first 5
+                
+                if not available_options:
+                    print("[WARNING] No options found in dropdown! Waiting longer...")
+                    time.sleep(2.0)  # Wait more for data to load
+                    all_options = self.driver.find_elements(By.XPATH, "//div[@data-part='content']//span")
+                    available_options = [opt.text for opt in all_options if opt.text.strip()]
+                    print(f"[DEBUG] After waiting: Available options ({len(available_options)}): {available_options[:5]}...")
+                    
+                    if not available_options:
+                        print("[ERROR] Still no options available!")
+                        self.driver.save_screenshot("no_dropdown_options.png")
+                        print("[DEBUG] Screenshot saved as no_dropdown_options.png")
+            except Exception as e:
+                print(f"[WARNING] Could not list dropdown options: {e}")
+                
+        except TimeoutException as e:
+            print(f"[ERROR] Failed to open dropdown: {str(e)}")
+            # Take screenshot for debugging
+            try:
+                self.driver.save_screenshot("dropdown_open_failed.png")
+                print("[DEBUG] Screenshot saved as dropdown_open_failed.png")
+            except:
+                pass
+            raise
 
         # Select each option
         for opt_text in options:
-            opt_xpath = f"//div[@data-part='content']//span[normalize-space()='{opt_text}']"
-            option = self.wait.until(EC.element_to_be_clickable((By.XPATH, opt_xpath)))
-            self.scroll_into_view(option)
-            self.driver.execute_script("arguments[0].click();", option)
-            print(f"[SUCCESS] Selected '{opt_text}'")
+            try:
+                opt_xpath = f"//div[@data-part='content']//span[normalize-space()='{opt_text}']"
+                print(f"[DEBUG] Looking for option: '{opt_text}'")
+                option = self.wait.until(EC.element_to_be_clickable((By.XPATH, opt_xpath)))
+                self.scroll_into_view(option)
+                self.driver.execute_script("arguments[0].click();", option)
+                print(f"[SUCCESS] Selected '{opt_text}'")
+            except TimeoutException:
+                print(f"[ERROR] Could not find option '{opt_text}' in dropdown")
+                raise
 
         # Close dropdown
         if is_multiselect:
@@ -125,15 +167,74 @@ class CreateRfiPage(BasePage):
         print(f"[DEBUG] Navigating to {Config.BASE_URL}/welcome")
         self.driver.get(f"{Config.BASE_URL}/welcome")
         self.wait_for_page_load()
+    
+    def debug_page_state(self):
+        """Debug helper to check current page state."""
+        print("\n=== DEBUG: PAGE STATE ===")
+        try:
+            print(f"Current URL: {self.driver.current_url}")
+            
+            # Check if Create RFI button exists
+            create_rfi_buttons = self.driver.find_elements(*self.CREATE_RFI_BUTTON)
+            print(f"Create RFI buttons found: {len(create_rfi_buttons)}")
+            
+            # Check if form is open
+            form_containers = self.driver.find_elements(*self.FORM_CONTAINER)
+            print(f"Form containers found: {len(form_containers)}")
+            
+            if form_containers:
+                # Check if Plot dropdown exists
+                plot_triggers = self.driver.find_elements(*self.PLOT_TRIGGER)
+                print(f"Plot No. dropdowns found: {len(plot_triggers)}")
+                if plot_triggers:
+                    print(f"  Plot dropdown visible: {plot_triggers[0].is_displayed()}")
+                    print(f"  Plot dropdown enabled: {plot_triggers[0].is_enabled()}")
+        except Exception as e:
+            print(f"Error in debug: {e}")
+        print("=== END DEBUG ===\n")
 
     def open_form(self):
         print("[INFO] Opening Create RFI form...")
-        self.safe_click(self.CREATE_RFI_BUTTON)
-        self.wait.until(EC.visibility_of_element_located(self.FORM_CONTAINER))
-        print("[SUCCESS] Form opened.")
+        try:
+            # Wait for Create RFI button to be visible and clickable
+            create_rfi_btn = self.wait.until(EC.element_to_be_clickable(self.CREATE_RFI_BUTTON))
+            self.scroll_into_view(create_rfi_btn)
+            time.sleep(0.5)  # Small wait for page to stabilize
+            create_rfi_btn.click()
+            
+            # Wait for form to open
+            self.wait.until(EC.visibility_of_element_located(self.FORM_CONTAINER))
+            print("[INFO] Form container visible, waiting for data to load...")
+            
+            # Wait longer for API data to load (dropdown options need to fetch from backend)
+            time.sleep(2.0)  # Increased wait for API data
+            print("[SUCCESS] Form opened and data should be loaded.")
+        except Exception as e:
+            print(f"[ERROR] Failed to open form: {str(e)}")
+            raise
 
     def fill_form(self):
         print("=== START FORM FILL ===")
+        
+        # Debug page state
+        self.debug_page_state()
+        
+        # Wait for first field to be ready
+        try:
+            print("[INFO] Waiting for Plot No. field to be ready...")
+            self.wait.until(EC.element_to_be_clickable(self.PLOT_TRIGGER))
+            time.sleep(0.5)  # Additional stabilization time
+            print("[SUCCESS] Form is ready for input.")
+        except Exception as e:
+            print(f"[ERROR] Form fields not ready: {str(e)}")
+            # Take screenshot
+            try:
+                self.driver.save_screenshot("form_not_ready.png")
+                print("[DEBUG] Screenshot saved as form_not_ready.png")
+            except:
+                pass
+            raise
+        
         self.select_dropdown_with_dependency_wait(self.PLOT_TRIGGER, "S05b", self.BLOCK_TRIGGER, "Block No.")
         self.select_dropdown_with_dependency_wait(self.BLOCK_TRIGGER, "BL05", self.PACKAGE_TRIGGER, "Package")
         self.select_dropdown_with_dependency_wait(self.PACKAGE_TRIGGER, "Civil", self.SUBPACKAGE_TRIGGER, "Sub-Package")
@@ -161,14 +262,17 @@ class CreateRfiPage(BasePage):
         print("=== FORM FILL COMPLETE ===")
 
     def submit_form(self):
-        print("[ACTION] Submitting form...")
+        """Click Proceed button to move from Step 1 (RFI details) to Step 2 (Inspection Checklist)."""
+        print("[ACTION] Clicking Proceed to go to Inspection Checklist...")
         try:
-            self.safe_click(self.PROCEED_BUTTON)
-        except Exception:
-            pass
-        self.safe_click(self.SUBMIT_BUTTON)
-        self.wait.until(EC.visibility_of_element_located(self.SUCCESS_TOAST))
-        print("[SUCCESS] RFI submitted successfully.")
+            # Wait for Proceed button and click it
+            proceed_btn = self.wait.until(EC.element_to_be_clickable(self.PROCEED_BUTTON))
+            self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", proceed_btn)
+            self.driver.execute_script("arguments[0].click();", proceed_btn)
+            print("[SUCCESS] Clicked Proceed - navigating to Inspection Checklist (Step 2).")
+        except Exception as e:
+            print(f"[ERROR] Failed to click Proceed button: {str(e)}")
+            raise
 
     def create_rfi(self):
         print("\n=== START RFI CREATION ===")

@@ -1,0 +1,12 @@
+camera field 
+<div data-scope="field" data-part="root" id="field:::r9g:" role="group" class="field__root"><label data-scope="field" data-part="label" id="field:::r9g:::label" for=":r9g:" class="field__label">Capture Photo</label><div class="d_flex flex-d_column gap_10px bd_1px_solid bd-c_accent.a4 mt_1 p_2 bdr_md"><div class="d_flex ai_center gap_3 flex-d_row"><div class="d_flex flex-d_column gap_10px w_20 h_20 ai_center jc_center bd_1px_dashed bd-c_neutral.default cursor_pointer hover:bg-c_neutral.a2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera c_info.default" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg><p class="text c_info.default fs_xs">Use Camera</p></div><div class="d_flex flex_1 gap_2 ov-x_auto scrs-t_x_mandatory"></div></div></div></div>
+
+
+camera modal open 
+<div class="d_flex flex-d_column gap_10px bg-c_bg.default p_4 bdr_md ai_center gap_4 max-w_90%"><video autoplay="" playsinline="" class="w_100% bdr_lg"></video><div class="d_flex ai_center gap_4 flex-d_row"><button type="button" class="button button--variant_gradient button--size_xs">Capture</button><button type="button" class="button button--variant_outline button--size_xs">Cancel</button></div></div>
+
+this camera capture so - provide access to camera and geo location 
+
+and for each inspectionpoints there is camera capture
+
+so file both text and image / capture field

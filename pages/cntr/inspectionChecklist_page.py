@@ -8,7 +8,19 @@ import time
 
 
 class InspectionChecklistPage(BasePage):
-    """Inspection Checklist Page - Fills form after RFI submission."""
+    """Inspection Checklist Page - Fills form after RFI submission.
+    
+    Features:
+    - Expands all 12 inspection questions
+    - Fills observation text for each question
+    - Optionally captures photos using browser camera
+    - Handles confirmation popup on submission
+    
+    Camera Capture:
+    - Requires Chrome with camera permissions (configured in conftest.py)
+    - Uses fake camera device for automated testing
+    - Can be disabled by setting capture_photos=False
+    """
 
     # Form header
     FORM_TITLE = (By.XPATH, "//p[contains(text(), 'Inspection Checklist')]")
@@ -21,6 +33,11 @@ class InspectionChecklistPage(BasePage):
     PROCEED_BUTTON = (By.XPATH, "//button[normalize-space()='Proceed']")
     PREV_BUTTON = (By.CSS_SELECTOR, "button.steps__prev-trigger")
     SUBMIT_BUTTON = (By.XPATH, "//button[normalize-space()='Submit']")
+    
+    # Confirmation popup - "Are you sure you want to Submit RFI?"
+    POPUP_DIALOG = (By.XPATH, "//div[@data-scope='dialog'][@role='dialog']")
+    POPUP_SUBMIT_BUTTON = (By.XPATH, "//div[@data-scope='dialog']//button[@type='submit'][@form='rfi-form']")
+    POPUP_CANCEL_BUTTON = (By.XPATH, "//div[@data-scope='dialog']//button[@data-part='close-trigger']")
     
     # Page 1 Fields (not visible, but keeping for reference)
     PLOT_DROPDOWN = (By.XPATH, "//label[.//span[contains(text(), 'Plot No.')]]//following-sibling::div//button")
@@ -38,6 +55,8 @@ class InspectionChecklistPage(BasePage):
     
     # Page 2 - Question sections (collapsed/expandable)
     QUESTION_SECTION = (By.CSS_SELECTOR, "div[data-scope='collapsible']")
+    # Button with text "Answer all the questions" and square-plus icon
+    EXPAND_ALL_BUTTON = (By.XPATH, "//p[contains(text(), 'Answer all the questions')]/following-sibling::button[.//svg[contains(@class, 'lucide-square-plus')]]")
     COLLAPSE_ALL_BUTTON = (By.XPATH, "//button[.//svg[contains(@class, 'lucide-square-minus')]]")
     EXPAND_BUTTON = (By.CSS_SELECTOR, "button.collapsible__trigger")
     
@@ -69,6 +88,83 @@ class InspectionChecklistPage(BasePage):
             return True
         except:
             return False
+    
+    def debug_page_structure(self):
+        """Debug helper to print page structure info."""
+        print("\n=== DEBUG: PAGE STRUCTURE ===")
+        try:
+            # Check collapsible sections
+            collapsibles = self.driver.find_elements(By.CSS_SELECTOR, "div[data-scope='collapsible']")
+            print(f"Total collapsible sections: {len(collapsibles)}")
+            
+            closed = self.driver.find_elements(By.XPATH, "//div[@data-scope='collapsible'][@data-state='closed']")
+            print(f"Closed sections: {len(closed)}")
+            
+            open_sections = self.driver.find_elements(By.XPATH, "//div[@data-scope='collapsible'][@data-state='open']")
+            print(f"Open sections: {len(open_sections)}")
+            
+            # Check for buttons
+            all_buttons = self.driver.find_elements(By.TAG_NAME, "button")
+            print(f"Total buttons on page: {len(all_buttons)}")
+            
+            # Check for camera icons
+            camera_icons = self.driver.find_elements(By.XPATH, "//svg[contains(@class, 'lucide-camera')]")
+            print(f"Camera icons found: {len(camera_icons)}")
+            
+            # Check for "Use Camera" text
+            use_camera_text = self.driver.find_elements(By.XPATH, "//p[contains(text(), 'Use Camera')]")
+            print(f"'Use Camera' text found: {len(use_camera_text)}")
+            
+            # Check for square-plus icon
+            plus_icons = self.driver.find_elements(By.XPATH, "//svg[contains(@class, 'lucide-square-plus')]")
+            print(f"Square-plus icons found: {len(plus_icons)}")
+            
+            # Check for the text
+            answer_text = self.driver.find_elements(By.XPATH, "//p[contains(text(), 'Answer all the questions')]")
+            print(f"'Answer all the questions' text found: {len(answer_text)}")
+            
+        except Exception as e:
+            print(f"Error in debug: {e}")
+        print("=== END DEBUG ===\n")
+    
+    def debug_popup_structure(self):
+        """Debug helper to print popup/dialog structure info."""
+        print("\n=== DEBUG: POPUP STRUCTURE ===")
+        try:
+            # Check for dialogs with data-scope
+            data_scope_dialogs = self.driver.find_elements(By.XPATH, "//div[@data-scope='dialog']")
+            print(f"Dialogs with data-scope='dialog': {len(data_scope_dialogs)}")
+            
+            # Check for dialogs by role
+            role_dialogs = self.driver.find_elements(By.XPATH, "//div[@role='dialog']")
+            print(f"Dialogs with role='dialog': {len(role_dialogs)}")
+            
+            # Check for confirmation text
+            confirm_text = self.driver.find_elements(By.XPATH, "//p[contains(text(), 'Are you sure')]")
+            if confirm_text:
+                print(f"Confirmation text found: '{confirm_text[0].text}'")
+            
+            # Check for all Submit buttons
+            submit_buttons = self.driver.find_elements(By.XPATH, "//button[normalize-space()='Submit']")
+            print(f"Total 'Submit' buttons: {len(submit_buttons)}")
+            
+            for idx, btn in enumerate(submit_buttons):
+                try:
+                    visible = btn.is_displayed()
+                    enabled = btn.is_enabled()
+                    btn_type = btn.get_attribute('type')
+                    btn_form = btn.get_attribute('form')
+                    print(f"  Submit button {idx+1}: Visible={visible}, Enabled={enabled}, type='{btn_type}', form='{btn_form}'")
+                except:
+                    pass
+            
+            # Check for Cancel button
+            cancel_buttons = self.driver.find_elements(By.XPATH, "//button[normalize-space()='Cancel']")
+            print(f"Cancel buttons: {len(cancel_buttons)}")
+            
+        except Exception as e:
+            print(f"Error in popup debug: {e}")
+        print("=== END POPUP DEBUG ===\n")
 
     def get_question_by_number(self, question_number):
         """Get question section by its number (1-12)."""
@@ -82,8 +178,18 @@ class InspectionChecklistPage(BasePage):
 
     def get_camera_button_for_question(self, question_number):
         """Get camera button for a specific question."""
-        xpath = f"(//div[contains(@class, 'lucide-camera')])[{question_number}]"
+        # The camera button is the clickable div with camera icon and "Use Camera" text
+        # Located within each question's collapsible section
+        xpath = f"(//div[@data-scope='collapsible'])[{question_number}]//div[contains(@class, 'cursor_pointer')]//svg[contains(@class, 'lucide-camera')]/ancestor::div[contains(@class, 'cursor_pointer')]"
         return (By.XPATH, xpath)
+    
+    def get_camera_capture_button(self):
+        """Get the Capture button in the camera modal."""
+        return (By.XPATH, "//button[normalize-space()='Capture']")
+    
+    def get_camera_cancel_button(self):
+        """Get the Cancel button in the camera modal."""
+        return (By.XPATH, "//button[normalize-space()='Cancel']")
 
     def expand_question_section(self, question_number):
         """Expand a specific question section if collapsed."""
@@ -108,18 +214,139 @@ class InspectionChecklistPage(BasePage):
         except Exception as e:
             print(f"[ERROR] Failed to expand question {question_number}: {str(e)}")
 
-    def fill_observation_for_question(self, question_number, observation_text):
-        """Fill observation/measured value for a specific question."""
-        print(f"[ACTION] Filling observation for question {question_number}...")
+    def capture_photo_for_question(self, question_number, skip_camera=False):
+        """Capture photo for a specific question.
         
-        # Expand the section first
-        self.expand_question_section(question_number)
+        Args:
+            question_number: The question number (1-12)
+            skip_camera: If True, skip camera capture (useful for headless mode)
+        """
+        if skip_camera:
+            print(f"[INFO] Skipping camera capture for question {question_number}")
+            return
+        
+        print(f"[ACTION] Capturing photo for question {question_number}...")
+        
+        try:
+            # Try multiple locator strategies to find the camera button
+            camera_btn = None
+            locators_to_try = [
+                # Strategy 1: By camera icon in question's collapsible section
+                (By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//div[contains(@class, 'cursor_pointer')]//svg[contains(@class, 'lucide-camera')]/ancestor::div[contains(@class, 'cursor_pointer')]"),
+                # Strategy 2: By "Use Camera" text
+                (By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//p[contains(text(), 'Use Camera')]/parent::div"),
+                # Strategy 3: Direct camera icon parent
+                (By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//svg[contains(@class, 'lucide-camera')]/parent::div"),
+                # Strategy 4: By index of all camera buttons
+                (By.XPATH, f"(//svg[contains(@class, 'lucide-camera')]/parent::div)[{question_number}]"),
+            ]
+            
+            for idx, locator in enumerate(locators_to_try, 1):
+                try:
+                    print(f"[DEBUG] Trying camera button locator strategy {idx}...")
+                    camera_btn = self.wait.until(EC.element_to_be_clickable(locator))
+                    print(f"[SUCCESS] Found camera button using strategy {idx}")
+                    break
+                except TimeoutException:
+                    continue
+            
+            if not camera_btn:
+                print(f"[ERROR] Could not find camera button for question {question_number}")
+                return
+            
+            # Click the camera button
+            self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", camera_btn)
+            time.sleep(0.3)
+            self.driver.execute_script("arguments[0].click();", camera_btn)
+            print(f"[DEBUG] Clicked 'Use Camera' button for question {question_number}")
+            
+            # Wait for camera modal to appear (with video element)
+            print("[INFO] Waiting for camera modal...")
+            try:
+                # Wait for video element or modal container
+                video_element = WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "video"))
+                )
+                print("[SUCCESS] Camera modal opened")
+                time.sleep(1.0)  # Give time for camera to initialize
+            except TimeoutException:
+                print("[WARNING] Camera modal video not detected, trying to proceed anyway...")
+                time.sleep(1.0)
+            
+            # Click Capture button in modal
+            try:
+                print("[DEBUG] Looking for Capture button...")
+                # Try multiple locators for Capture button
+                capture_locators = [
+                    (By.XPATH, "//button[normalize-space()='Capture']"),
+                    (By.XPATH, "//button[contains(@class, 'button--variant_gradient')][contains(text(), 'Capture')]"),
+                    (By.XPATH, "//div[.//video]//button[contains(text(), 'Capture')]"),
+                ]
+                
+                capture_btn = None
+                for loc in capture_locators:
+                    try:
+                        capture_btn = WebDriverWait(self.driver, 3).until(EC.element_to_be_clickable(loc))
+                        break
+                    except:
+                        continue
+                
+                if capture_btn:
+                    capture_btn.click()
+                    print(f"[SUCCESS] Captured photo for question {question_number}")
+                    time.sleep(0.8)  # Wait for photo to be processed and modal to close
+                else:
+                    print(f"[WARNING] Capture button not found for question {question_number}")
+                    # Try to close modal with Cancel
+                    self._close_camera_modal()
+                    
+            except Exception as e:
+                print(f"[WARNING] Error clicking Capture button: {str(e)}")
+                self._close_camera_modal()
+                
+        except Exception as e:
+            print(f"[WARNING] Could not capture photo for question {question_number}: {str(e)}")
+            print("[INFO] Continuing without photo...")
+            self._close_camera_modal()
+    
+    def _close_camera_modal(self):
+        """Helper to close camera modal if it's open."""
+        try:
+            cancel_btn = self.driver.find_element(By.XPATH, "//button[normalize-space()='Cancel']")
+            cancel_btn.click()
+            print("[INFO] Closed camera modal")
+            time.sleep(0.3)
+        except:
+            # Try pressing Escape key
+            try:
+                from selenium.webdriver.common.keys import Keys
+                self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                print("[INFO] Closed camera modal with ESC key")
+            except:
+                pass
+    
+    def fill_observation_for_question(self, question_number, observation_text, expand_first=False):
+        """Fill observation/measured value for a specific question.
+        
+        Args:
+            question_number: The question number (1-12)
+            observation_text: Text to fill in the observation field
+            expand_first: If True, expand the question before filling (default: False)
+        """
+        print(f"[ACTION] Filling observation for question {question_number}...")
         
         # Find and fill the input
         input_locator = self.get_observation_input_for_question(question_number)
         
         try:
-            input_element = self.wait.until(EC.visibility_of_element_located(input_locator))
+            # Try to find the input - if not visible, expand the section first
+            try:
+                input_element = self.wait.until(EC.visibility_of_element_located(input_locator))
+            except TimeoutException:
+                print(f"[DEBUG] Input not visible for question {question_number}, expanding section...")
+                self.expand_question_section(question_number)
+                input_element = self.wait.until(EC.visibility_of_element_located(input_locator))
+            
             self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", input_element)
             time.sleep(0.2)
             
@@ -131,9 +358,17 @@ class InspectionChecklistPage(BasePage):
         except Exception as e:
             print(f"[ERROR] Failed to fill observation for question {question_number}: {str(e)}")
 
-    def fill_all_questions_on_page_2(self, observations=None):
-        """Fill all 12 questions on page 2 with observations."""
+    def fill_all_questions_on_page_2(self, observations=None, capture_photos=False):
+        """Fill all 12 questions on page 2 with observations and optionally capture photos.
+        
+        Args:
+            observations: List of observation texts (defaults to standard observations)
+            capture_photos: If True, capture photos for each question (default: False)
+        """
         print("=== FILLING ALL QUESTIONS ON PAGE 2 ===")
+        
+        # First, expand all questions at once using the master button
+        self.expand_all_questions()
         
         # Default observations if none provided
         if observations is None:
@@ -156,12 +391,124 @@ class InspectionChecklistPage(BasePage):
         while len(observations) < 12:
             observations.append("Verified as per installation manual")
         
-        # Fill each question
+        # Fill each question (they should all be expanded now)
         for i in range(1, 13):
+            # Fill observation text
             self.fill_observation_for_question(i, observations[i-1])
+            
+            # Optionally capture photo
+            if capture_photos:
+                self.capture_photo_for_question(i, skip_camera=not capture_photos)
+            
             time.sleep(0.2)  # Small delay between questions
         
         print("=== ALL QUESTIONS FILLED ===")
+
+    def expand_all_questions(self):
+        """Click the expand all button (square-plus icon) to open all question sections at once."""
+        print("[ACTION] Expanding all question sections...")
+        
+        # Take screenshot for debugging
+        try:
+            self.driver.save_screenshot("before_expand_all.png")
+            print("[DEBUG] Screenshot saved as before_expand_all.png")
+        except:
+            pass
+        
+        # Try multiple locator strategies
+        locators_to_try = [
+            ("Text + sibling button", "//p[contains(text(), 'Answer all the questions')]/following-sibling::button"),
+            ("Parent div approach", "//div[.//p[contains(text(), 'Answer all the questions')]]//button[.//svg[contains(@class, 'lucide-square-plus')]]"),
+            ("SVG icon only", "//svg[contains(@class, 'lucide-square-plus')]/parent::button"),
+            ("Button with ghost variant", "//button[contains(@class, 'button--variant_ghost')]//svg[contains(@class, 'lucide-square-plus')]/parent::button"),
+            ("Direct button class", "button.button--variant_ghost.button--size_xs"),
+        ]
+        
+        expand_btn = None
+        used_locator = None
+        
+        for locator_name, locator_xpath in locators_to_try:
+            try:
+                print(f"[DEBUG] Trying locator: {locator_name}")
+                if locator_xpath.startswith("button."):
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, locator_xpath)
+                else:
+                    elements = self.driver.find_elements(By.XPATH, locator_xpath)
+                
+                if elements:
+                    # Filter for visible and enabled buttons
+                    for elem in elements:
+                        if elem.is_displayed() and elem.is_enabled():
+                            expand_btn = elem
+                            used_locator = locator_name
+                            print(f"[SUCCESS] Found button using: {locator_name}")
+                            break
+                    if expand_btn:
+                        break
+            except Exception as e:
+                print(f"[DEBUG] Locator '{locator_name}' failed: {str(e)}")
+                continue
+        
+        if not expand_btn:
+            print("[WARNING] Standard locators failed. Trying aggressive search...")
+            # Last resort: find ALL buttons and check for square-plus icon
+            try:
+                all_buttons = self.driver.find_elements(By.TAG_NAME, "button")
+                print(f"[DEBUG] Found {len(all_buttons)} total buttons on page")
+                
+                for idx, btn in enumerate(all_buttons):
+                    try:
+                        if btn.is_displayed() and btn.is_enabled():
+                            # Check if this button contains a square-plus SVG
+                            svgs = btn.find_elements(By.TAG_NAME, "svg")
+                            for svg in svgs:
+                                svg_class = svg.get_attribute("class")
+                                if svg_class and "lucide-square-plus" in svg_class:
+                                    expand_btn = btn
+                                    used_locator = f"Aggressive search (button #{idx})"
+                                    print(f"[SUCCESS] Found button with square-plus icon (button #{idx})")
+                                    break
+                            if expand_btn:
+                                break
+                    except:
+                        continue
+            except Exception as e:
+                print(f"[DEBUG] Aggressive search failed: {str(e)}")
+        
+        if not expand_btn:
+            print("[ERROR] Could not find expand all button with any method!")
+            print("[INFO] Will expand questions individually...")
+            return
+        
+        try:
+            # Scroll to button
+            self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", expand_btn)
+            time.sleep(0.5)
+            
+            # Try regular click first
+            try:
+                expand_btn.click()
+                print("[DEBUG] Clicked button using regular click()")
+            except:
+                # Fallback to JavaScript click
+                self.driver.execute_script("arguments[0].click();", expand_btn)
+                print("[DEBUG] Clicked button using JavaScript click()")
+            
+            time.sleep(1.0)  # Give time for accordions to expand
+            
+            # Verify at least one question is now open
+            try:
+                open_sections = self.driver.find_elements(By.XPATH, "//div[@data-scope='collapsible'][@data-state='open']")
+                if len(open_sections) > 0:
+                    print(f"[SUCCESS] All questions expanded. Found {len(open_sections)} open questions.")
+                else:
+                    print("[WARNING] Button clicked but no questions appear to be open. Will expand individually...")
+            except:
+                print("[WARNING] Could not verify questions expanded, but continuing...")
+                
+        except Exception as e:
+            print(f"[WARNING] Failed to click expand all button: {str(e)}")
+            print("[INFO] Will try expanding questions individually...")
 
     def collapse_all_questions(self):
         """Click the collapse all button to minimize all sections."""
@@ -188,17 +535,91 @@ class InspectionChecklistPage(BasePage):
             print(f"[ERROR] Failed to click Proceed: {str(e)}")
 
     def submit_checklist_form(self):
-        """Submit the inspection checklist form."""
+        """Submit the inspection checklist form and handle confirmation popup.
+        
+        Workflow:
+        1. Click the main Submit button on the form
+        2. A confirmation popup appears with its own Submit button
+        3. Click the Submit button on the popup
+        4. Wait for success toast message
+        """
         print("[ACTION] Submitting inspection checklist form...")
         try:
             # Scroll to bottom
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(0.3)
             
+            # Click the initial Submit button
             submit_btn = self.wait.until(EC.element_to_be_clickable(self.SUBMIT_BUTTON))
             self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", submit_btn)
             time.sleep(0.3)
             self.driver.execute_script("arguments[0].click();", submit_btn)
+            print("[INFO] Clicked Submit button - waiting for confirmation popup...")
+            
+            # Wait for confirmation popup to appear
+            print("[INFO] Waiting for confirmation dialog...")
+            try:
+                # Wait for dialog to be visible
+                self.wait.until(EC.visibility_of_element_located(self.POPUP_DIALOG))
+                print("[SUCCESS] Confirmation dialog appeared!")
+            except TimeoutException:
+                print("[WARNING] Dialog did not appear within timeout, trying anyway...")
+            
+            time.sleep(0.5)
+            
+            # Debug popup structure
+            self.debug_popup_structure()
+            
+            # Try multiple locators for the popup Submit button
+            popup_submit_locators = [
+                # Most specific: dialog with form submit button
+                (By.XPATH, "//div[@data-scope='dialog']//button[@type='submit'][@form='rfi-form']"),
+                # By dialog role and Submit text
+                (By.XPATH, "//div[@role='dialog']//button[normalize-space()='Submit']"),
+                # By data-scope dialog
+                (By.XPATH, "//div[@data-scope='dialog']//button[normalize-space()='Submit']"),
+                # By button variant in dialog
+                (By.XPATH, "//div[@data-scope='dialog']//button[contains(@class, 'button--variant_gradient')]"),
+                # Second Submit button on page
+                (By.XPATH, "(//button[normalize-space()='Submit'])[2]"),
+            ]
+            
+            popup_clicked = False
+            for locator in popup_submit_locators:
+                try:
+                    popup_submit = self.wait.until(EC.element_to_be_clickable(locator))
+                    self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", popup_submit)
+                    time.sleep(0.2)
+                    self.driver.execute_script("arguments[0].click();", popup_submit)
+                    print("[SUCCESS] Clicked Submit button on confirmation popup!")
+                    popup_clicked = True
+                    break
+                except:
+                    continue
+            
+            if not popup_clicked:
+                print("[WARNING] Standard popup locators failed. Trying aggressive search...")
+                # Find all Submit buttons and click the visible one that's not the first
+                try:
+                    all_submit_buttons = self.driver.find_elements(By.XPATH, "//button[normalize-space()='Submit']")
+                    print(f"[DEBUG] Found {len(all_submit_buttons)} Submit buttons")
+                    
+                    for idx, btn in enumerate(all_submit_buttons):
+                        try:
+                            if btn.is_displayed() and btn.is_enabled():
+                                # Skip the first one (main form submit), click the second (popup)
+                                if idx > 0:
+                                    self.driver.execute_script("arguments[0].click();", btn)
+                                    print(f"[SUCCESS] Clicked Submit button #{idx+1} (popup)")
+                                    popup_clicked = True
+                                    break
+                        except:
+                            continue
+                except Exception as e:
+                    print(f"[DEBUG] Aggressive popup search failed: {str(e)}")
+            
+            if not popup_clicked:
+                print("[WARNING] Could not find popup Submit button, trying to continue anyway...")
             
             # Wait for success message
             self.wait.until(EC.visibility_of_element_located(self.SUCCESS_TOAST))
@@ -206,10 +627,22 @@ class InspectionChecklistPage(BasePage):
             
         except Exception as e:
             print(f"[ERROR] Failed to submit form: {str(e)}")
+            # Take screenshot for debugging
+            try:
+                self.driver.save_screenshot("submit_error.png")
+                print("[DEBUG] Screenshot saved as submit_error.png")
+            except:
+                pass
             raise
 
-    def complete_inspection_checklist(self, observations=None):
-        """Complete the entire inspection checklist workflow."""
+    def complete_inspection_checklist(self, observations=None, capture_photos=False):
+        """Complete the entire inspection checklist workflow.
+        
+        Args:
+            observations: List of observation texts for the 12 questions
+            capture_photos: If True, capture photos for each question (default: False)
+                           Note: Requires browser camera permissions
+        """
         print("\n=== STARTING INSPECTION CHECKLIST ===")
         
         # Wait for form to load
@@ -226,8 +659,11 @@ class InspectionChecklistPage(BasePage):
         
         print("[INFO] Now on page 2 - Filling questions...")
         
-        # Fill all questions
-        self.fill_all_questions_on_page_2(observations)
+        # Debug: Show page structure
+        self.debug_page_structure()
+        
+        # Fill all questions (with optional photo capture)
+        self.fill_all_questions_on_page_2(observations, capture_photos=capture_photos)
         
         # Optionally collapse sections for cleaner view
         # self.collapse_all_questions()
