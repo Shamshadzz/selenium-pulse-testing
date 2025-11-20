@@ -225,89 +225,200 @@ class InspectionChecklistPage(BasePage):
             print(f"[INFO] Skipping camera capture for question {question_number}")
             return
         
-        print(f"[ACTION] Capturing photo for question {question_number}...")
+        print(f"\n[ACTION] 📸 Starting camera capture for QUESTION {question_number}...")
+        print(f"[DEBUG] Ensuring clean state before capture...")
+        
+        # CRITICAL: Ensure no modal is open from previous question
+        try:
+            existing_videos = self.driver.find_elements(By.TAG_NAME, "video")
+            visible_videos = [v for v in existing_videos if v.is_displayed()]
+            if visible_videos:
+                print(f"[WARNING] ⚠️ Found {len(visible_videos)} open video modal(s) before question {question_number}")
+                print(f"[ACTION] Forcefully closing any open modals...")
+                self._close_camera_modal()
+                time.sleep(0.5)  # Reduced wait
+                
+                # Double-check modal is closed
+                remaining_videos = [v for v in self.driver.find_elements(By.TAG_NAME, "video") if v.is_displayed()]
+                if remaining_videos:
+                    print(f"[ERROR] ❌ Modal still open! Trying ESC key...")
+                    self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                    time.sleep(0.3)
+        except Exception as e:
+            print(f"[DEBUG] Error checking for existing modals: {e}")
         
         try:
-            # Try multiple locator strategies to find the camera button
-            camera_btn = None
+            # Find the camera button within this specific question
+            print(f"[DEBUG] Looking for camera button in question {question_number}...")
+            
+            # Try multiple locator strategies with detailed debugging
+            # Based on actual HTML: <div class="cursor_pointer"><svg class="lucide lucide-camera">...<p>Use Camera</p></div>
             locators_to_try = [
-                # Strategy 1: By camera icon in question's collapsible section
-                (By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//div[contains(@class, 'cursor_pointer')]//svg[contains(@class, 'lucide-camera')]/ancestor::div[contains(@class, 'cursor_pointer')]"),
-                # Strategy 2: By "Use Camera" text
-                (By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//p[contains(text(), 'Use Camera')]/parent::div"),
-                # Strategy 3: Direct camera icon parent
-                (By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//svg[contains(@class, 'lucide-camera')]/parent::div"),
-                # Strategy 4: By index of all camera buttons
-                (By.XPATH, f"(//svg[contains(@class, 'lucide-camera')]/parent::div)[{question_number}]"),
+                (f"Strategy 1: Direct cursor_pointer div with camera SVG", 
+                 By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//div[@class='cursor_pointer' and .//svg[contains(@class, 'lucide-camera')]]"),
+                (f"Strategy 2: Camera SVG parent div", 
+                 By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//svg[contains(@class, 'lucide-camera')]/parent::div"),
+                (f"Strategy 3: Div containing 'Use Camera' text with camera icon", 
+                 By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//div[.//p[contains(text(), 'Use Camera')] and .//svg[contains(@class, 'lucide-camera')]]"),
+                (f"Strategy 4: Any div with cursor_pointer class in question section", 
+                 By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]//div[contains(@class, 'cursor_pointer')]"),
             ]
             
-            for idx, locator in enumerate(locators_to_try, 1):
+            camera_btn = None
+            for strategy_name, locator_type, locator_value in locators_to_try:
                 try:
-                    print(f"[DEBUG] Trying camera button locator strategy {idx}...")
-                    camera_btn = self.wait.until(EC.element_to_be_clickable(locator))
-                    print(f"[SUCCESS] Found camera button using strategy {idx}")
-                    break
-                except TimeoutException:
+                    print(f"[DEBUG] Trying: {strategy_name}")
+                    elements = self.driver.find_elements(locator_type, locator_value)
+                    print(f"[DEBUG]   Found {len(elements)} elements")
+                    if elements:
+                        # CRITICAL: Use the first element found within THIS question's scope
+                        # The locator already filters by question number, so first element should be correct
+                        camera_btn = elements[0]
+                        print(f"[SUCCESS] ✓ {strategy_name} worked - using first element!")
+                        
+                        # Verify this button is within the correct question section
+                        try:
+                            question_section = self.driver.find_element(By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]")
+                            # Check if camera_btn is a descendant of this question section
+                            is_in_correct_section = self.driver.execute_script(
+                                "return arguments[0].contains(arguments[1]);", 
+                                question_section, camera_btn
+                            )
+                            if is_in_correct_section:
+                                print(f"[VERIFY] ✓ Camera button IS in question {question_number} section")
+                            else:
+                                print(f"[WARNING] ❌ Camera button NOT in question {question_number}, trying next strategy...")
+                                camera_btn = None
+                                continue
+                        except Exception as verify_err:
+                            print(f"[WARNING] Could not verify button location: {verify_err}")
+                        
+                        break
+                except Exception as e:
+                    print(f"[DEBUG]   Failed: {str(e)}")
                     continue
             
             if not camera_btn:
-                print(f"[ERROR] Could not find camera button for question {question_number}")
+                print(f"[ERROR] ❌ Could not find camera button for question {question_number} with any strategy")
+                # Extensive debugging
+                print("\n[DEBUG] === DEBUGGING CAMERA BUTTON LOCATION ===")
+                try:
+                    # Check if question section exists
+                    question_section = self.driver.find_element(By.XPATH, f"(//div[@data-scope='collapsible'])[{question_number}]")
+                    print(f"[DEBUG] ✓ Question section {question_number} exists")
+                    
+                    # Check for camera icons in this section
+                    camera_icons = question_section.find_elements(By.XPATH, ".//svg[contains(@class, 'lucide-camera')]")
+                    print(f"[DEBUG] Camera icons in question {question_number}: {len(camera_icons)}")
+                    
+                    # Check for any clickable divs
+                    clickable_divs = question_section.find_elements(By.XPATH, ".//div[contains(@class, 'cursor_pointer')]")
+                    print(f"[DEBUG] Clickable divs in question {question_number}: {len(clickable_divs)}")
+                    
+                    # Check for "Use Camera" text
+                    use_camera_text = question_section.find_elements(By.XPATH, ".//p[contains(text(), 'Use Camera')]")
+                    print(f"[DEBUG] 'Use Camera' text found: {len(use_camera_text)}")
+                    
+                    # Get the HTML of the section for inspection
+                    section_html = question_section.get_attribute('outerHTML')[:500]
+                    print(f"[DEBUG] Question section HTML preview:\n{section_html}...")
+                    
+                    # Take screenshot for visual debugging
+                    screenshot_name = f"camera_button_not_found_q{question_number}.png"
+                    self.driver.save_screenshot(screenshot_name)
+                    print(f"[DEBUG] Screenshot saved as {screenshot_name}")
+                    
+                except Exception as debug_err:
+                    print(f"[DEBUG] Debug failed: {debug_err}")
+                print("[DEBUG] === END DEBUGGING ===\n")
                 return
             
-            # Click the camera button
-            self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", camera_btn)
-            time.sleep(0.3)
+            # Scroll to the button and click
+            print(f"[DEBUG] Scrolling to camera button...")
+            self.driver.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", camera_btn)
+            time.sleep(0.3)  # Reduced wait
+            
+            # Check if button is visible and enabled
+            is_visible = camera_btn.is_displayed()
+            is_enabled = camera_btn.is_enabled()
+            print(f"[DEBUG] Camera button - Visible: {is_visible}, Enabled: {is_enabled}")
+            
+            if not is_visible:
+                print(f"[WARNING] Camera button not visible, trying to make it visible...")
+                self.driver.execute_script("arguments[0].style.display='block';", camera_btn)
+                time.sleep(0.3)
+            
+            # Click using JavaScript for reliability
+            print(f"[DEBUG] Clicking camera button with JavaScript...")
             self.driver.execute_script("arguments[0].click();", camera_btn)
-            print(f"[DEBUG] Clicked 'Use Camera' button for question {question_number}")
+            print(f"[DEBUG] ✓ Clicked camera button for question {question_number}")
             
             # Wait for camera modal to appear (with video element)
-            print("[INFO] Waiting for camera modal...")
+            print("[DEBUG] Waiting for camera modal to open...")
             try:
-                # Wait for video element or modal container
                 video_element = WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.TAG_NAME, "video"))
+                    EC.visibility_of_element_located((By.TAG_NAME, "video"))
                 )
-                print("[SUCCESS] Camera modal opened")
-                time.sleep(1.0)  # Give time for camera to initialize
+                print("[SUCCESS] ✓ Camera modal opened with video feed")
+                time.sleep(0.5)  # Reduced camera initialization time
             except TimeoutException:
-                print("[WARNING] Camera modal video not detected, trying to proceed anyway...")
-                time.sleep(1.0)
+                print("[ERROR] ❌ Camera modal did not open (no video element)")
+                # Check what's on the page
+                print("[DEBUG] Checking page state after click...")
+                videos = self.driver.find_elements(By.TAG_NAME, "video")
+                print(f"[DEBUG] Video elements found: {len(videos)}")
+                buttons = self.driver.find_elements(By.TAG_NAME, "button")
+                capture_btns = [b for b in buttons if "capture" in b.text.lower()]
+                print(f"[DEBUG] Buttons with 'capture' text: {len(capture_btns)}")
+                return
             
             # Click Capture button in modal
+            print("[DEBUG] Looking for Capture button in modal...")
             try:
-                print("[DEBUG] Looking for Capture button...")
-                # Try multiple locators for Capture button
-                capture_locators = [
-                    (By.XPATH, "//button[normalize-space()='Capture']"),
-                    (By.XPATH, "//button[contains(@class, 'button--variant_gradient')][contains(text(), 'Capture')]"),
-                    (By.XPATH, "//div[.//video]//button[contains(text(), 'Capture')]"),
-                ]
+                capture_btn = WebDriverWait(self.driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[normalize-space()='Capture']"))
+                )
+                capture_btn.click()
+                print(f"[SUCCESS] ✓ Clicked Capture button")
                 
-                capture_btn = None
-                for loc in capture_locators:
-                    try:
-                        capture_btn = WebDriverWait(self.driver, 3).until(EC.element_to_be_clickable(loc))
-                        break
-                    except:
-                        continue
-                
-                if capture_btn:
-                    capture_btn.click()
-                    print(f"[SUCCESS] Captured photo for question {question_number}")
-                    time.sleep(0.8)  # Wait for photo to be processed and modal to close
-                else:
-                    print(f"[WARNING] Capture button not found for question {question_number}")
-                    # Try to close modal with Cancel
+                # Wait for modal to close (video element should disappear)
+                print("[DEBUG] Waiting for modal to close...")
+                try:
+                    WebDriverWait(self.driver, 5).until(
+                        EC.invisibility_of_element_located((By.TAG_NAME, "video"))
+                    )
+                    print(f"[SUCCESS] ✅ Photo captured and modal closed for question {question_number}")
+                except TimeoutException:
+                    print(f"[WARNING] ⚠️ Modal didn't close automatically, forcing close...")
                     self._close_camera_modal()
-                    
-            except Exception as e:
-                print(f"[WARNING] Error clicking Capture button: {str(e)}")
+                
+                # Wait for modal to fully close
+                time.sleep(0.4)  # Reduced wait
+                
+                # Final verification: No video elements visible
+                final_check = [v for v in self.driver.find_elements(By.TAG_NAME, "video") if v.is_displayed()]
+                if final_check:
+                    print(f"[ERROR] ❌ Video still visible! Force closing again...")
+                    self._close_camera_modal()
+                    time.sleep(0.3)
+                else:
+                    print(f"[VERIFY] ✓ Modal fully closed, ready for next question")
+                
+            except TimeoutException:
+                print(f"[ERROR] ❌ Capture button not found in modal")
                 self._close_camera_modal()
+                return
+            except Exception as e:
+                print(f"[ERROR] ❌ Error clicking Capture button: {str(e)}")
+                self._close_camera_modal()
+                return
                 
         except Exception as e:
-            print(f"[WARNING] Could not capture photo for question {question_number}: {str(e)}")
-            print("[INFO] Continuing without photo...")
+            print(f"[ERROR] ❌ Camera capture failed for question {question_number}: {str(e)}")
+            print("[INFO] Attempting to close any open modals...")
             self._close_camera_modal()
+            import traceback
+            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
     
     def _close_camera_modal(self):
         """Helper to close camera modal if it's open."""
@@ -347,8 +458,8 @@ class InspectionChecklistPage(BasePage):
                 self.expand_question_section(question_number)
                 input_element = self.wait.until(EC.visibility_of_element_located(input_locator))
             
-            self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", input_element)
-            time.sleep(0.2)
+            self.driver.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", input_element)
+            time.sleep(0.1)  # Reduced wait
             
             input_element.clear()
             input_element.send_keys(observation_text)
@@ -365,10 +476,13 @@ class InspectionChecklistPage(BasePage):
             observations: List of observation texts (defaults to standard observations)
             capture_photos: If True, capture photos for each question (default: False)
         """
-        print("=== FILLING ALL QUESTIONS ON PAGE 2 ===")
+        print("\n" + "="*60)
+        print("FILLING ALL QUESTIONS ON PAGE 2")
+        print("="*60)
         
         # First, expand all questions at once using the master button
         self.expand_all_questions()
+        time.sleep(0.5)  # Reduced wait time for expansion
         
         # Default observations if none provided
         if observations is None:
@@ -393,16 +507,63 @@ class InspectionChecklistPage(BasePage):
         
         # Fill each question (they should all be expanded now)
         for i in range(1, 13):
-            # Fill observation text
+            print(f"\n{'='*60}")
+            print(f"📝 PROCESSING QUESTION {i}/12")
+            print(f"{'='*60}")
+            
+            # CRITICAL: Scroll to question and wait for it to be stable
+            try:
+                question_section = self.driver.find_element(By.XPATH, f"(//div[@data-scope='collapsible'])[{i}]")
+                
+                # Scroll to center of question section (instant scroll, no smooth)
+                self.driver.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", question_section)
+                time.sleep(0.3)  # Reduced wait time
+                    
+            except Exception as e:
+                print(f"[WARNING] Could not scroll to question {i}: {e}")
+            
+            # Step 1: Fill observation text
+            print(f"[STEP 1/2] Filling observation text...")
             self.fill_observation_for_question(i, observations[i-1])
+            time.sleep(0.2)  # Reduced wait time
             
-            # Optionally capture photo
+            # Step 2: Optionally capture photo
             if capture_photos:
-                self.capture_photo_for_question(i, skip_camera=not capture_photos)
+                print(f"[STEP 2/2] Camera capture for question {i}...")
+                time.sleep(0.3)  # Reduced pause
+                
+                self.capture_photo_for_question(i, skip_camera=False)
+                
+                # CRITICAL: Verify modal is fully closed before moving to next question
+                print(f"[VERIFY] Checking modal closure after question {i}...")
+                time.sleep(0.3)  # Reduced wait
+                try:
+                    open_videos = self.driver.find_elements(By.TAG_NAME, "video")
+                    visible_videos = [v for v in open_videos if v.is_displayed()]
+                    if visible_videos:
+                        print(f"[WARNING] ⚠️ {len(visible_videos)} camera modal(s) still visible after question {i}!")
+                        print("[ACTION] Forcing modal closure...")
+                        self._close_camera_modal()
+                        time.sleep(0.5)  # Reduced wait
+                        
+                        # Double-check
+                        still_visible = [v for v in self.driver.find_elements(By.TAG_NAME, "video") if v.is_displayed()]
+                        if still_visible:
+                            print(f"[ERROR] ❌ Modal STILL open! Pressing ESC...")
+                            self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                            time.sleep(0.3)  # Reduced wait
+                    else:
+                        print(f"[VERIFY] ✓ No open modals, safe to proceed")
+                except Exception as verify_err:
+                    print(f"[WARNING] Modal verification failed: {verify_err}")
             
-            time.sleep(0.2)  # Small delay between questions
+            print(f"[SUCCESS] ✅ Question {i} COMPLETED")
+            print(f"{'─'*60}\n")
+            time.sleep(0.2)  # Reduced delay between questions
         
-        print("=== ALL QUESTIONS FILLED ===")
+        print("\n" + "="*60)
+        print("✅ ALL 12 QUESTIONS FILLED SUCCESSFULLY")
+        print("="*60 + "\n")
 
     def expand_all_questions(self):
         """Click the expand all button (square-plus icon) to open all question sections at once."""
