@@ -116,8 +116,8 @@ class CreateRfiPage(BasePage):
             print(f"[ERROR] Failed to open dropdown: {str(e)}")
             # Take screenshot for debugging
             try:
-                self.driver.save_screenshot("dropdown_open_failed.png")
-                print("[DEBUG] Screenshot saved as dropdown_open_failed.png")
+                self.driver.save_screenshot("errors/dropdown_open_failed.png")
+                print("[DEBUG] Screenshot saved as errors/dropdown_open_failed.png")
             except:
                 pass
             raise

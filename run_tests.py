@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
-CLI script to run specific test workflows/pages with role-based authentication.
+Enhanced CLI script with parent scenario commands.
+
 Usage:
-    python run_tests.py --role contractor --workflow rfi
-    python run_tests.py --role admin --page create_rfi
-    python run_tests.py --role contractor --all
-    python run_tests.py --list
+    # Run complete scenarios (PARENT COMMANDS)
+    python run_tests_enhanced.py --scenario rfi_complete
+    python run_tests_enhanced.py --scenario rfi_rejection
+    
+    # List all scenarios
+    python run_tests_enhanced.py --list-scenarios
+    
+    # Run individual workflows
+    python run_tests_enhanced.py --role contractor --workflow rfi
 """
 
 import argparse
@@ -18,13 +24,154 @@ from config.test_data import TestData
 # Available roles
 ROLES = list(TestData.ROLES.keys())
 
-# Role-based workflows and pages
-# Format: {role: {workflow_name: {description, pytest_args}}}
+# ============================================================================
+# PARENT SCENARIOS - Complete multi-role workflows
+# ============================================================================
+SCENARIOS = {
+    "rfi_complete": {
+        "description": "Complete RFI lifecycle - Create → Review → Inspect → Approve",
+        "steps": [
+            {
+                "role": "contractor",
+                "workflow": "rfi",
+                "description": "Contractor creates RFI with inspection checklist"
+            },
+            {
+                "role": "block_engineer",
+                "workflow": "review_rfi",
+                "description": "Block Engineer reviews and approves RFI"
+            },
+            {
+                "role": "quality_inspector",
+                "workflow": "inspect_rfi",
+                "description": "Quality Inspector inspects RFI (PASS)"
+            },
+            {
+                "role": "quality_inspector",
+                "workflow": "final_approval",
+                "description": "Quality Inspector gives final approval"
+            }
+        ]
+    },
+    "rfi_rejection": {
+        "description": "RFI rejection workflow - Create → Request Changes",
+        "steps": [
+            {
+                "role": "contractor",
+                "workflow": "rfi",
+                "description": "Contractor creates RFI"
+            },
+            {
+                "role": "block_engineer",
+                "workflow": "request_changes",
+                "description": "Block Engineer requests changes"
+            }
+        ]
+    },
+    "rfi_inspection_fail": {
+        "description": "RFI inspection failure - Create → Review → Fail",
+        "steps": [
+            {
+                "role": "contractor",
+                "workflow": "rfi",
+                "description": "Contractor creates RFI"
+            },
+            {
+                "role": "block_engineer",
+                "workflow": "review_rfi",
+                "description": "Block Engineer reviews RFI"
+            },
+            {
+                "role": "quality_inspector",
+                "workflow": "inspect_rfi_fail",
+                "description": "Quality Inspector fails inspection"
+            }
+        ]
+    },
+    "contractor_only": {
+        "description": "Contractor workflows only - Create RFI",
+        "steps": [
+            {
+                "role": "contractor",
+                "workflow": "rfi",
+                "description": "Contractor creates RFI with inspection checklist"
+            }
+        ]
+    },
+    "block_engineer_only": {
+        "description": "Block Engineer workflows - Review → Approve",
+        "steps": [
+            {
+                "role": "block_engineer",
+                "workflow": "review_rfi",
+                "description": "Block Engineer reviews RFI"
+            },
+            {
+                "role": "block_engineer",
+                "workflow": "approve_rfi",
+                "description": "Block Engineer gives final approval"
+            }
+        ]
+    },
+    "quality_inspector_only": {
+        "description": "Quality Inspector workflows - Inspect → Final Approval",
+        "steps": [
+            {
+                "role": "quality_inspector",
+                "workflow": "inspect_rfi",
+                "description": "Quality Inspector inspects RFI"
+            },
+            {
+                "role": "quality_inspector",
+                "workflow": "final_approval",
+                "description": "Quality Inspector gives final approval"
+            }
+        ]
+    }
+}
+
+# ============================================================================
+# ROLE-BASED WORKFLOWS
+# ============================================================================
 WORKFLOWS_BY_ROLE = {
     "contractor": {
         "rfi": {
             "description": "Test RFI creation workflow (Contractor)",
             "pytest_args": ["-m", "rfi", "-v"]
+        }
+    },
+    "contractor_incharge": {
+        "rfi": {
+            "description": "Test RFI & Inspection workflow (Contractor Incharge)",
+            "pytest_args": ["tests/cntr/test_createRfi.py", "-k", "test_contractor_incharge_workflow", "-v"]
+        }
+    },
+    "block_engineer": {
+        "review_rfi": {
+            "description": "Test RFI review workflow (Block Engineer)",
+            "pytest_args": ["tests/block_engineer/test_review_rfi.py", "-k", "test_review_rfi_workflow", "-v"]
+        },
+        "approve_rfi": {
+            "description": "Test RFI final approval workflow (Block Engineer)",
+            "pytest_args": ["tests/block_engineer/test_approve_rfi.py", "-k", "test_approve_rfi_workflow", "-v"]
+        },
+        "request_changes": {
+            "description": "Test RFI request changes workflow (Block Engineer)",
+            "pytest_args": ["tests/block_engineer/test_review_rfi.py", "-k", "test_review_rfi_request_changes", "-v"]
+        }
+    },
+    "quality_inspector": {
+        "inspect_rfi": {
+            "description": "Test RFI inspection workflow (Quality Inspector)",
+            "pytest_args": ["tests/quality/test_inspect_rfi.py", "-k", "test_inspect_rfi_pass_workflow", "-v"]
+        },
+        "inspect_rfi_fail": {
+            "description": "Test RFI inspection fail workflow (Quality Inspector)",
+            "pytest_args": ["tests/quality/test_inspect_rfi.py", "-k", "test_inspect_rfi_fail_workflow", "-v"]
+        },
+        "final_approval": {
+            "description": "Test final approval workflow (Quality Inspector)",
+            "pytest_args": ["tests/quality/test_final_approval.py", "-k", "test_final_approval_workflow", "-v"]
         }
     },
     "admin": {
@@ -47,178 +194,212 @@ WORKFLOWS_BY_ROLE = {
     }
 }
 
-# Role-based pages
-# Format: {role: {page_name: {description, pytest_args}}}
-PAGES_BY_ROLE = {
-    "contractor": {
-        "create_rfi": {
-            "description": "Test Create RFI page (Contractor)",
-            "pytest_args": ["tests/cntr/test_createRfi.py", "-v"]
-        }
-    },
-    "admin": {
-        "admin_panel": {
-            "description": "Test Admin Panel page",
-            "pytest_args": ["tests/admin/test_admin_panel.py", "-v"]
-        }
-    },
-    "project_manager": {
-        "pm_dashboard": {
-            "description": "Test PM Dashboard page",
-            "pytest_args": ["tests/pm/test_pm_dashboard.py", "-v"]
-        }
-    },
-    "client": {
-        "client_portal": {
-            "description": "Test Client Portal page",
-            "pytest_args": ["tests/client/test_client_portal.py", "-v"]
-        }
-    }
-}
 
-# Common workflows (not role-specific)
-COMMON_WORKFLOWS = {
-    "login": {
-        "description": "Test login functionality",
-        "pytest_args": ["-m", "login", "-v"]
-    }
-}
-
-# Common pages (not role-specific)
-COMMON_PAGES = {
-    "login": {
-        "description": "Test Login page",
-        "pytest_args": ["tests/test_login.py", "-v"]
-    }
-}
+def print_scenarios():
+    """Print available parent scenarios."""
+    print("\n" + "="*80)
+    print("📋 PARENT SCENARIOS (Multi-Step Workflows)")
+    print("="*80)
+    for name, data in SCENARIOS.items():
+        print(f"\n  🎯 {name}")
+        print(f"     {data['description']}")
+        print(f"     Steps:")
+        for idx, step in enumerate(data['steps'], 1):
+            print(f"       {idx}. [{step['role']}] {step['description']}")
+    print("\n" + "="*80)
+    print("Usage: python run_tests_enhanced.py --scenario <scenario_name>")
+    print("="*80 + "\n")
 
 
-def print_menu():
-    """Print available roles, workflows and pages."""
-    print("\n" + "="*70)
-    print("Available Roles:")
-    print("="*70)
-    for role in ROLES:
-        print(f"  {role}")
-    
-    print("\n" + "="*70)
-    print("Role-based Workflows:")
-    print("="*70)
+def print_workflows():
+    """Print available role-based workflows."""
+    print("\n" + "="*80)
+    print("🔄 ROLE-BASED WORKFLOWS")
+    print("="*80)
     for role, workflows in WORKFLOWS_BY_ROLE.items():
         print(f"\n  {role.upper()}:")
         for key, value in workflows.items():
             print(f"    {key:20} - {value['description']}")
-    
-    print("\n" + "="*70)
-    print("Role-based Pages:")
-    print("="*70)
-    for role, pages in PAGES_BY_ROLE.items():
-        print(f"\n  {role.upper()}:")
-        for key, value in pages.items():
-            print(f"    {key:20} - {value['description']}")
-    
-    print("\n" + "="*70)
-    print("Common Workflows (no role required):")
-    print("="*70)
-    for key, value in COMMON_WORKFLOWS.items():
-        print(f"  {key:15} - {value['description']}")
-    
-    print("\n" + "="*70)
-    print("Common Pages (no role required):")
-    print("="*70)
-    for key, value in COMMON_PAGES.items():
-        print(f"  {key:15} - {value['description']}")
-    print("="*70 + "\n")
+    print("\n" + "="*80)
+    print("Usage: python run_tests_enhanced.py --role <role> --workflow <workflow_name>")
+    print("="*80 + "\n")
 
 
 def get_python_executable():
-    """Get the Python executable to use, preferring virtual environment if available."""
-    # Check if we're already in a virtual environment
+    """Get the Python executable to use."""
     if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
-        # Already in a virtual environment
         return sys.executable
     
-    # Check for venv in the project directory
     script_dir = Path(__file__).parent
     venv_dir = script_dir / "venv"
     
     if venv_dir.exists():
-        # Windows
         venv_python = venv_dir / "Scripts" / "python.exe"
         if venv_python.exists():
             return str(venv_python)
-        
-        # Unix/Linux/Mac
         venv_python = venv_dir / "bin" / "python"
         if venv_python.exists():
             return str(venv_python)
     
-    # Check for VIRTUAL_ENV environment variable
     venv_env = os.environ.get("VIRTUAL_ENV")
     if venv_env:
         venv_path = Path(venv_env)
-        # Windows
         venv_python = venv_path / "Scripts" / "python.exe"
         if venv_python.exists():
             return str(venv_python)
-        # Unix/Linux/Mac
         venv_python = venv_path / "bin" / "python"
         if venv_python.exists():
             return str(venv_python)
     
-    # Fall back to current Python
     return sys.executable
+
 
 def run_tests(pytest_args):
     """Run pytest with given arguments."""
     python_exe = get_python_executable()
     cmd = [python_exe, "-m", "pytest"] + pytest_args
     
-    print(f"\nRunning: {' '.join(cmd)}\n")
+    print(f"\n{'='*80}")
+    print(f"▶️  Running: {' '.join(cmd)}")
+    print(f"{'='*80}\n")
+    
     result = subprocess.run(cmd)
     return result.returncode
 
 
+def run_scenario(scenario_name, html_report=False):
+    """Run a complete multi-step scenario."""
+    if scenario_name not in SCENARIOS:
+        print(f"❌ Error: Scenario '{scenario_name}' not found")
+        print("\nAvailable scenarios:")
+        for name in SCENARIOS.keys():
+            print(f"  - {name}")
+        return 1
+    
+    scenario = SCENARIOS[scenario_name]
+    steps = scenario['steps']
+    
+    print("\n" + "="*80)
+    print(f"🎯 RUNNING SCENARIO: {scenario_name}")
+    print(f"📝 Description: {scenario['description']}")
+    print(f"📊 Total Steps: {len(steps)}")
+    print("="*80)
+    
+    failed_steps = []
+    
+    for idx, step in enumerate(steps, 1):
+        role = step['role']
+        workflow = step['workflow']
+        description = step['description']
+        
+        print(f"\n{'─'*80}")
+        print(f"⏩ STEP {idx}/{len(steps)}: {description}")
+        print(f"   Role: {role} | Workflow: {workflow}")
+        print(f"{'─'*80}")
+        
+        # Get pytest args for this workflow
+        if role in WORKFLOWS_BY_ROLE and workflow in WORKFLOWS_BY_ROLE[role]:
+            workflow_data = WORKFLOWS_BY_ROLE[role][workflow]
+            pytest_args = workflow_data['pytest_args'].copy()
+            
+            if html_report:
+                pytest_args.extend(["--html=report.html", "--self-contained-html"])
+            
+            # Run the test
+            returncode = run_tests(pytest_args)
+            
+            if returncode != 0:
+                print(f"\n❌ STEP {idx} FAILED: {description}")
+                failed_steps.append(f"Step {idx}: {description}")
+                
+                # Ask user if they want to continue
+                print(f"\n⚠️  Step failed. Continue with remaining steps? (y/n): ", end='')
+                try:
+                    response = input().strip().lower()
+                    if response != 'y':
+                        print("\n🛑 Scenario execution stopped by user")
+                        break
+                except:
+                    print("\n🛑 Scenario execution stopped")
+                    break
+            else:
+                print(f"\n✅ STEP {idx} COMPLETED: {description}")
+        else:
+            print(f"❌ Error: Workflow '{workflow}' not found for role '{role}'")
+            failed_steps.append(f"Step {idx}: Workflow not found")
+    
+    # Summary
+    print("\n" + "="*80)
+    print(f"📊 SCENARIO SUMMARY: {scenario_name}")
+    print("="*80)
+    if failed_steps:
+        print(f"❌ Status: FAILED")
+        print(f"📉 Failed Steps: {len(failed_steps)}/{len(steps)}")
+        for failed in failed_steps:
+            print(f"   - {failed}")
+    else:
+        print(f"✅ Status: SUCCESS")
+        print(f"📈 All {len(steps)} steps completed successfully!")
+    print("="*80 + "\n")
+    
+    return 0 if not failed_steps else 1
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Run Selenium tests for specific workflows or pages with role-based authentication",
+        description="Run Selenium test scenarios and workflows",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_tests.py --role contractor --workflow rfi
-  python run_tests.py --role contractor --page create_rfi
-  python run_tests.py --role admin --all
-  python run_tests.py --workflow login  (no role needed)
-  python run_tests.py --list
+  # Run complete scenarios (PARENT COMMANDS)
+  python run_tests_enhanced.py --scenario rfi_complete
+  python run_tests_enhanced.py --scenario rfi_rejection
+  python run_tests_enhanced.py --scenario contractor_only
+  
+  # Run individual workflows
+  python run_tests_enhanced.py --role contractor --workflow rfi
+  python run_tests_enhanced.py --role block_engineer --workflow review_rfi
+  python run_tests_enhanced.py --role quality_inspector --workflow inspect_rfi
+  
+  # List available options
+  python run_tests_enhanced.py --list-scenarios
+  python run_tests_enhanced.py --list-workflows
+  python run_tests_enhanced.py --list
         """
+    )
+    
+    parser.add_argument(
+        "--scenario", "-s",
+        help="Run a complete parent scenario (multi-step workflow)"
     )
     
     parser.add_argument(
         "--role", "-r",
         choices=ROLES,
-        help="Role to use for authentication (contractor, admin, project_manager, client)"
+        help="Role for authentication"
     )
     
     parser.add_argument(
         "--workflow", "-w",
-        help="Run tests for a specific workflow (use --list to see available workflows)"
+        help="Run specific workflow for the given role"
     )
     
     parser.add_argument(
-        "--page", "-p",
-        help="Run tests for a specific page (use --list to see available pages)"
-    )
-    
-    parser.add_argument(
-        "--all", "-a",
+        "--list-scenarios",
         action="store_true",
-        help="Run all tests (optionally filtered by role)"
+        help="List all available parent scenarios"
+    )
+    
+    parser.add_argument(
+        "--list-workflows",
+        action="store_true",
+        help="List all available role-based workflows"
     )
     
     parser.add_argument(
         "--list", "-l",
         action="store_true",
-        help="List all available roles, workflows and pages"
+        help="List all available scenarios and workflows"
     )
     
     parser.add_argument(
@@ -229,74 +410,54 @@ Examples:
     
     args = parser.parse_args()
     
-    if args.list:
-        print_menu()
+    # Handle list commands
+    if args.list_scenarios:
+        print_scenarios()
         return 0
     
-    pytest_args = []
+    if args.list_workflows:
+        print_workflows()
+        return 0
     
-    if args.html_report:
-        pytest_args.extend(["--html=report.html", "--self-contained-html"])
+    if args.list:
+        print_scenarios()
+        print_workflows()
+        return 0
     
-    if args.all:
-        if args.role:
-            print(f"\nRunning all tests for role: {args.role}")
-            # Filter tests by role marker if available
-            pytest_args.extend(["-m", args.role, "-v"])
+    # Handle scenario execution (PARENT COMMAND)
+    if args.scenario:
+        return run_scenario(args.scenario, args.html_report)
+    
+    # Handle individual workflow execution
+    if args.role and args.workflow:
+        if args.role in WORKFLOWS_BY_ROLE and args.workflow in WORKFLOWS_BY_ROLE[args.role]:
+            workflow = WORKFLOWS_BY_ROLE[args.role][args.workflow]
+            print(f"\n▶️  Running workflow: {args.workflow}")
+            print(f"   Role: {args.role}")
+            print(f"   Description: {workflow['description']}\n")
+            
+            pytest_args = workflow["pytest_args"].copy()
+            if args.html_report:
+                pytest_args.extend(["--html=report.html", "--self-contained-html"])
+            
+            return run_tests(pytest_args)
         else:
-            print("\nRunning all tests")
-            pytest_args.extend(["-v"])
-    elif args.workflow:
-        # Check if it's a common workflow
-        if args.workflow in COMMON_WORKFLOWS:
-            workflow = COMMON_WORKFLOWS[args.workflow]
-            print(f"\nRunning workflow: {args.workflow}")
-            print(f"Description: {workflow['description']}\n")
-            pytest_args.extend(workflow["pytest_args"])
-        elif args.role and args.role in WORKFLOWS_BY_ROLE:
-            if args.workflow in WORKFLOWS_BY_ROLE[args.role]:
-                workflow = WORKFLOWS_BY_ROLE[args.role][args.workflow]
-                print(f"\nRunning workflow: {args.workflow} (Role: {args.role})")
-                print(f"Description: {workflow['description']}\n")
-                pytest_args.extend(workflow["pytest_args"])
-            else:
-                print(f"Error: Workflow '{args.workflow}' not found for role '{args.role}'")
-                print(f"Available workflows for {args.role}: {list(WORKFLOWS_BY_ROLE[args.role].keys())}")
-                return 1
-        else:
-            print("Error: Role is required for role-based workflows")
-            print("Use --role to specify a role, or use --list to see available options")
+            print(f"❌ Error: Workflow '{args.workflow}' not found for role '{args.role}'")
+            if args.role in WORKFLOWS_BY_ROLE:
+                print(f"\nAvailable workflows for {args.role}:")
+                for wf in WORKFLOWS_BY_ROLE[args.role].keys():
+                    print(f"  - {wf}")
             return 1
-    elif args.page:
-        # Check if it's a common page
-        if args.page in COMMON_PAGES:
-            page = COMMON_PAGES[args.page]
-            print(f"\nRunning page tests: {args.page}")
-            print(f"Description: {page['description']}\n")
-            pytest_args.extend(page["pytest_args"])
-        elif args.role and args.role in PAGES_BY_ROLE:
-            if args.page in PAGES_BY_ROLE[args.role]:
-                page = PAGES_BY_ROLE[args.role][args.page]
-                print(f"\nRunning page tests: {args.page} (Role: {args.role})")
-                print(f"Description: {page['description']}\n")
-                pytest_args.extend(page["pytest_args"])
-            else:
-                print(f"Error: Page '{args.page}' not found for role '{args.role}'")
-                print(f"Available pages for {args.role}: {list(PAGES_BY_ROLE[args.role].keys())}")
-                return 1
-        else:
-            print("Error: Role is required for role-based pages")
-            print("Use --role to specify a role, or use --list to see available options")
-            return 1
-    else:
-        print("Error: Please specify --workflow, --page, --all, or --list")
-        print_menu()
-        parser.print_help()
-        return 1
     
-    return run_tests(pytest_args)
+    # No valid arguments provided
+    print("❌ Error: Please specify --scenario, or --role with --workflow, or --list")
+    print("\nQuick help:")
+    print("  --list            : Show all available options")
+    print("  --scenario <name> : Run a complete parent scenario")
+    print("  --role <role> --workflow <name> : Run individual workflow")
+    print("\nFor detailed help: python run_tests_enhanced.py --help")
+    return 1
 
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -29,7 +29,14 @@ def _create_driver():
     }
     chrome_options.add_experimental_option("prefs", prefs)
     
-    service = Service(ChromeDriverManager().install())
+    # Install chromedriver and get the correct path
+    driver_path = ChromeDriverManager().install()
+    # Fix for webdriver-manager returning THIRD_PARTY_NOTICES path
+    if "THIRD_PARTY_NOTICES" in driver_path:
+        import os
+        driver_path = os.path.join(os.path.dirname(driver_path), "chromedriver.exe")
+    
+    service = Service(driver_path)
     driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.implicitly_wait(Config.IMPLICIT_WAIT)
     driver.maximize_window()
@@ -98,6 +105,30 @@ def client_driver():
     """Setup a logged-in driver with client role - persists across tests"""
     driver = _create_driver()
     _login_as_role(driver, "client")
+    yield driver
+    driver.quit()
+
+@pytest.fixture(scope="session")
+def contractor_incharge_driver():
+    """Setup a logged-in driver with contractor incharge role - persists across tests"""
+    driver = _create_driver()
+    _login_as_role(driver, "contractor_incharge")
+    yield driver
+    driver.quit()
+
+@pytest.fixture(scope="session")
+def block_engineer_driver():
+    """Setup a logged-in driver with block engineer role - persists across tests"""
+    driver = _create_driver()
+    _login_as_role(driver, "block_engineer")
+    yield driver
+    driver.quit()
+
+@pytest.fixture(scope="session")
+def quality_inspector_driver():
+    """Setup a logged-in driver with quality inspector role - persists across tests"""
+    driver = _create_driver()
+    _login_as_role(driver, "quality_inspector")
     yield driver
     driver.quit()
 

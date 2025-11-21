@@ -40,13 +40,16 @@ class LoginPage(BasePage):
         """Navigate to the login page and wait until input field is loaded."""
         self.driver.get(f"{Config.BASE_URL}/login")
         print(f"[DEBUG] Navigating to {Config.BASE_URL}/login")
+        
+        # Wait for the website to be fully loaded
+        self.wait_for_page_load(timeout=10)
 
         try:
             self.wait.until(EC.presence_of_element_located(self.USERNAME_INPUT))
             print("[DEBUG] Login page loaded successfully.")
         except Exception:
-            print("[WARN] Username input not found quickly — waiting for full page load.")
-            self.wait_for_page_load(timeout=5)
+            print("[WARN] Username input not found quickly — re-checking.")
+            self.wait.until(EC.presence_of_element_located(self.USERNAME_INPUT))
 
     # -----------------------------------------------------
     # INPUT HANDLING
@@ -57,8 +60,8 @@ class LoginPage(BasePage):
             field = self.wait.until(EC.visibility_of_element_located(self.USERNAME_INPUT))
             field.clear()
             field.send_keys(username)
-            field.send_keys(Keys.TAB)
-            time.sleep(0.3)
+            field.send_keys(Keys.TAB) # Tab after filling input
+            time.sleep(0.5) # Short wait after tab
             print(f"[DEBUG] Username entered: {username}")
         except Exception as e:
             print(f"[ERROR] Failed to enter username: {e}")
@@ -70,8 +73,8 @@ class LoginPage(BasePage):
             field = self.wait.until(EC.visibility_of_element_located(self.PASSWORD_INPUT))
             field.clear()
             field.send_keys(password)
-            field.send_keys(Keys.TAB)
-            time.sleep(0.3)
+            field.send_keys(Keys.TAB) # Tab after filling input
+            time.sleep(0.5) # Short wait after tab
             print("[DEBUG] Password entered and blurred")
         except Exception as e:
             print(f"[ERROR] Failed to enter password: {e}")
@@ -142,9 +145,9 @@ class LoginPage(BasePage):
                     print("[WARN] Spinner did not disappear — continuing anyway.")
 
         except Exception as e:
-            print(f"[ERROR] Login flow failed: {e}")
-            self.driver.save_screenshot("login_failed.png")
-            print("[SCREENSHOT] Saved as login_failed.png")
+            print(f"[ERROR] Login failed: {str(e)}")
+            self.driver.save_screenshot("errors/login_failed.png")
+            print("[SCREENSHOT] Saved as errors/login_failed.png")
             raise
 
     # -----------------------------------------------------

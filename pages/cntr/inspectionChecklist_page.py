@@ -324,7 +324,7 @@ class InspectionChecklistPage(BasePage):
                     print(f"[DEBUG] Question section HTML preview:\n{section_html}...")
                     
                     # Take screenshot for visual debugging
-                    screenshot_name = f"camera_button_not_found_q{question_number}.png"
+                    screenshot_name = f"errors/camera_button_not_found_q{question_number}.png"
                     self.driver.save_screenshot(screenshot_name)
                     print(f"[DEBUG] Screenshot saved as {screenshot_name}")
                     
@@ -571,8 +571,8 @@ class InspectionChecklistPage(BasePage):
         
         # Take screenshot for debugging
         try:
-            self.driver.save_screenshot("before_expand_all.png")
-            print("[DEBUG] Screenshot saved as before_expand_all.png")
+            self.driver.save_screenshot("errors/before_expand_all.png")
+            print("[DEBUG] Screenshot saved as errors/before_expand_all.png")
         except:
             pass
         
@@ -790,8 +790,8 @@ class InspectionChecklistPage(BasePage):
             print(f"[ERROR] Failed to submit form: {str(e)}")
             # Take screenshot for debugging
             try:
-                self.driver.save_screenshot("submit_error.png")
-                print("[DEBUG] Screenshot saved as submit_error.png")
+                self.driver.save_screenshot("errors/submit_error.png")
+                print("[DEBUG] Screenshot saved as errors/submit_error.png")
             except:
                 pass
             raise

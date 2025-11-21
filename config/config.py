@@ -1,5 +1,5 @@
 class Config:
-    BASE_URL = "http://localhost:8080"  # Your React app URL
+    BASE_URL = "https://pulse-docker.cfapps.ap11.hana.ondemand.com"
     IMPLICIT_WAIT = 2
     EXPLICIT_WAIT = 5
     BROWSER = "chrome"

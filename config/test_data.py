@@ -1,41 +1,37 @@
 class TestData:
-    # Role-based login credentials
     ROLES = {
         "contractor": {
             "username": "contractor1@gmail.com",
             "password": "Test@1234"
         },
+        "block_engineer": {
+            "username": "engineer1@adani.com",
+            "password": "Test@1234"
+        },
+        "quality_inspector": {
+            "username": "inspector9@adani.com",
+            "password": "Test@1234"
+        },
+        "contractor_incharge": {
+            "username": "contractor.incharge2@gmail.com",
+            "password": "Test@1234"
+        },
         "admin": {
-            "username": "admin@example.com",  # Update with actual admin credentials
-            "password": "Admin@1234"  # Update with actual admin password
+            "username": "admin@example.com",
+            "password": "Admin@1234"
         },
         "project_manager": {
-            "username": "pm@example.com",  # Update with actual PM credentials
-            "password": "PM@1234"  # Update with actual PM password
+            "username": "pm@example.com",
+            "password": "PM@1234"
         },
         "client": {
-            "username": "client@example.com",  # Update with actual client credentials
-            "password": "Client@1234"  # Update with actual client password
+            "username": "client@example.com",
+            "password": "Client@1234"
         }
     }
-    
-    # Backward compatibility - defaults to contractor
-    VALID_USERNAME = ROLES["contractor"]["username"]
-    VALID_PASSWORD = ROLES["contractor"]["password"]
-    
+
     INVALID_USERNAME = "invalid@example.com"
     INVALID_PASSWORD = "wrong_password"
-    
-    # Test data for different workflows
-    WORKFLOW_1_DATA = {
-        "field1": "value1",
-        "field2": "value2"
-    }
-    
-    WORKFLOW_2_DATA = {
-        "name": "Test Name",
-        "description": "Test Description"
-    }
     
     @classmethod
     def get_credentials(cls, role):
